@@ -29,7 +29,7 @@ module baud_gen_tb;
     initial begin
         // Initialize Inputs
         reset = 1;
-        #100; // Wait for 100 ns
+        #200; // Wait for 100 ns
 
         // Release reset
         reset = 0;
@@ -41,8 +41,8 @@ module baud_gen_tb;
 
     // Monitor output
     initial begin
-        $monitor("Time = %0t ns, reset = %b, sys_clk = %b, baud_tick = %b",
-                 $time, reset, sys_clk, baud_tick);
+        $monitor("Time = %0t ns, reset = %b, baud_tick = %b",
+                 $time, reset, baud_tick);
     end
 
     // Dump waves
