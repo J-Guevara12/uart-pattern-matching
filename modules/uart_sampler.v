@@ -7,7 +7,9 @@ module uart_sampler (
     input  wire       baud_tick,
     input  wire       rx_in,
     output reg  [7:0] data_out,
-    output reg        data_valid
+    output reg        data_valid,
+    output reg        serial_out,
+    output reg        serial_valid
 );
 
     // State machine definitions
@@ -29,9 +31,12 @@ module uart_sampler (
             data_out <= 0;
             data_valid <= 0;
             shift_reg <= 0;
+            serial_out <= 0;
+            serial_valid <= 0;
         end else begin
             // Default assignments
             data_valid <= 0;
+            serial_valid <= 0;
 
             case (state)
                 IDLE: begin
@@ -53,6 +58,10 @@ module uart_sampler (
 
                 SAMPLING: begin
                     if (baud_tick) begin
+                        // Output the sampled bit for the SIPO register
+                        serial_out <= rx_in;
+                        serial_valid <= 1;
+
                         // Shift the received bit into the MSB. Since UART is LSB-first,
                         // the first bit (D0) will end up in the LSB position after 8 shifts.
                         shift_reg <= {rx_in, shift_reg[7:1]};
