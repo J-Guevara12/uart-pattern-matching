@@ -1,6 +1,42 @@
 # UART Pattern Matching FSM
 
-This project implements a pattern detector system that identifies a given 4-bit sequence in a serial input stream received via UART.
+This project implements a pattern detector system that identifies a given 4-bit sequence in a serial input stream received via UART. The system is designed in Verilog and verified with a comprehensive testbench.
+
+## System Overview
+
+
+
+```mermaid
+graph LR
+subgraph Top Module
+    top_module[top]
+    baud_gen_inst[baud_gen]
+    uart_sampler_inst[uart_sampler]
+    sipo_reg_inst[sipo_reg]
+    detector_inst[detector]
+
+    top_module -- sys_clk, reset --> baud_gen_inst
+    top_module -- sys_clk, reset, rx_in --> uart_sampler_inst
+    top_module -- sys_clk, reset --> sipo_reg_inst
+    top_module -- sys_clk, reset --> detector_inst
+
+    baud_gen_inst -- baud_tick --> uart_sampler_inst
+    uart_sampler_inst -- serial_out --> sipo_reg_inst
+    uart_sampler_inst -- serial_valid --> sipo_reg_inst
+    sipo_reg_inst -- parallel_out[sipo_out] --> top_module
+    top_module -- sipo_out_reg[sipo_out_reg[3:0]] --> detector_inst
+    detector_inst -- match[match_comb] --> top_module
+    top_module -- match --> top_module_output(match)
+end
+```
+
+The system is composed of four main modules that work together to achieve the pattern detection:
+1.  **Baud Rate Generator (`baud_gen.v`):** Generates the timing reference for the UART communication.
+2.  **UART Sampler (`uart_sampler.v`):** Receives the serial data and outputs a bit-stream.
+3.  **SIPO Register (`sipo_reg.v`):** Stores the most recent bits from the stream.
+4.  **Pattern Detector (`detector.v`):** Compares the stored bits with the target pattern.
+
+These modules are integrated in a top-level module (`top.v`) that provides the final output. The entire system is clocked by a 25 MHz system clock, while the UART communication operates at 115200 bps.
 
 ## Modules
 
@@ -104,10 +140,64 @@ The testbench (`testbenches/sipo_reg_tb.v`) is designed to confirm the correct s
 
 The simulation confirms the expected behavior. As each bit of `8'hD6` is clocked in, the `parallel_out` register is updated accordingly. After 8 clock cycles, `parallel_out` correctly holds the value `D6`. Subsequently, as the new bits `1`, `0`, and `1` are shifted in, the register value changes to `AD`, then `5A`, and finally `B5`, correctly reflecting the sliding window of the most recent 8 bits.
 
-The full simulation VCD is available at `var_dumps/sipo_reg.vcd`.
-
 **Waveform:**
 
 The waveform below illustrates the `serial_in` bit being shifted into the `parallel_out` register on each clock edge.
 
 ![SIPO Register Waveform](images/sipo_reg.png)
+
+### 4. Pattern Detector (`detector.v`)
+
+This is a simple combinational module that compares the four least significant bits of the SIPO register's output with a predefined pattern.
+
+**Functionality:**
+- **Input:** `data_in` (a 4-bit signal from the SIPO register).
+- **Output:** `match` (asserted high when the input matches the pattern).
+
+The pattern is hardcoded to `4'b0110`, which corresponds to the student ID digit `6`. The comparison is performed using a simple equality check.
+
+#### Testbench and Verification
+
+The testbench (`testbenches/detector_tb.v`) verifies the detector's logic by providing a series of inputs and checking the `match` output.
+
+**Test Strategy:**
+1.  **Matching Case:** The input is set to `4'b0110` to confirm that the `match` signal is correctly asserted.
+2.  **Non-Matching Cases:** The input is set to various other patterns, such as `4'b1111` and `4'b0111`, to ensure the `match` signal remains low.
+
+**Simulation Results Analysis:**
+
+The simulation ran successfully, and the output confirms that the detector's logic is correct. The `match` signal was high only when the input was `0110`, and it was low for all other test cases. The testbench reported "All tests passed!", confirming the module's functionality.
+
+**Waveform:**
+
+The waveform below shows the `match` signal going high when the `data_in` matches the target pattern `0110`.
+
+![Detector Waveform](images/detector.png)
+
+### 5. Top-Level Module (`top.v`)
+
+This module integrates all the components into a single, functional system. It connects the baud rate generator, UART sampler, SIPO register, and pattern detector.
+
+**Functionality:**
+The `top` module is responsible for the correct data flow between the sub-modules. The most critical part of the design is ensuring that the data is sampled and checked for matches on the correct clock cycles. The final, debugged implementation uses the following logic:
+- The `sipo_reg` is clocked by the main `sys_clk` and is enabled by the `serial_valid` signal from the `uart_sampler`.
+- A one-cycle delay register (`sipo_out_reg`) is added to ensure the `detector` checks the SIPO register's state from the *previous* clock cycle, preventing a race condition.
+- The final `match` signal is a single `sys_clk` pulse, generated combinationally from the `serial_valid` signal and the output of the detector.
+
+#### Testbench and Verification
+
+The testbench (`testbenches/top_tb.v`) is designed to verify the entire system's functionality with a comprehensive set of test cases:
+1.  **Simple Match:** A byte is sent that contains the pattern at the end.
+2.  **No Match:** A byte is sent that does not contain the pattern.
+3.  **Overlapping Match:** A byte is sent that contains the pattern twice in an overlapping manner.
+4.  **Back-to-Back Match:** Two consecutive bytes form the pattern at their boundary.
+5.  **Noise/Glitch:** A short glitch is simulated on the `rx_in` line to ensure it is ignored.
+6.  **Reset:** The reset signal is asserted during a transmission to ensure the system correctly returns to its idle state.
+
+The testbench monitors the `match` output and prints a "SUCCESS" message when the pattern is detected, confirming that the system works as expected.
+
+**Waveform:**
+
+The waveform below shows the match of the sutendt ID **6** when the propper input is given:
+
+![Top Level module waveform](images/top.png)
