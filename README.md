@@ -80,3 +80,34 @@ The simulation VCD is available at `var_dumps/uart_sampler.vcd`.
 The waveform below shows the `rx_in` signal transmitting the byte `D6` and the corresponding `data_out` and `data_valid` signals after reception.
 
 ![UART Sampler Waveform](images/uart_sampler.png)
+
+### 3. SIPO Register (`sipo_reg.v`)
+
+This module implements an 8-bit Serial-In, Parallel-Out (SIPO) shift register. It is responsible for capturing the history of the last 8 bits received from the serial data stream, which is essential for pattern detection.
+
+**Functionality:**
+- **Inputs:** `clk` (driven by the `baud_tick`), `reset`, and `serial_in` (the data bit from the UART sampler).
+- **Output:** `parallel_out` (an 8-bit vector representing the last 8 bits received).
+
+On each clock cycle, the module shifts the `serial_in` bit into the most significant bit (MSB) of an 8-bit register. The existing bits are shifted to the right, and the oldest bit (at the LSB) is discarded. This creates a sliding window of the 8 most recent serial bits.
+
+#### Testbench and Verification
+
+The testbench (`testbenches/sipo_reg_tb.v`) is designed to confirm the correct shift-and-store operation of the register.
+
+**Test Strategy:**
+1.  **Initialization:** The simulation begins with a reset to ensure the register is cleared to zero.
+2.  **Data Shifting:** The byte `8'hD6` (`11010110`) is shifted in bit-by-bit. This specific value is chosen because it is a non-trivial pattern of ones and zeros, which is effective for verifying that bits are not stuck or incorrectly shifted.
+3.  **Window Sliding:** After the full byte is loaded, three additional bits (`1`, `0`, `1`) are shifted in. This test case is crucial to demonstrate that the register correctly handles a continuous data stream by discarding the oldest bits as new ones arrive, simulating the behavior required for overlapping pattern detection.
+
+**Simulation Results Analysis:**
+
+The simulation confirms the expected behavior. As each bit of `8'hD6` is clocked in, the `parallel_out` register is updated accordingly. After 8 clock cycles, `parallel_out` correctly holds the value `D6`. Subsequently, as the new bits `1`, `0`, and `1` are shifted in, the register value changes to `AD`, then `5A`, and finally `B5`, correctly reflecting the sliding window of the most recent 8 bits.
+
+The full simulation VCD is available at `var_dumps/sipo_reg.vcd`.
+
+**Waveform:**
+
+The waveform below illustrates the `serial_in` bit being shifted into the `parallel_out` register on each clock edge.
+
+![SIPO Register Waveform](images/sipo_reg.png)
