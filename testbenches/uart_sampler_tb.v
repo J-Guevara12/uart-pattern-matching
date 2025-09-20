@@ -24,6 +24,9 @@ module uart_sampler_tb;
         .baud_tick(baud_tick)
     );
 
+    wire serial_out;
+    wire serial_valid;
+
     // Instantiate the Unit Under Test (UUT)
     uart_sampler uut (
         .sys_clk(sys_clk),
@@ -31,7 +34,9 @@ module uart_sampler_tb;
         .baud_tick(baud_tick),
         .rx_in(rx_in),
         .data_out(data_out),
-        .data_valid(data_valid)
+        .data_valid(data_valid),
+        .serial_out(serial_out),
+        .serial_valid(serial_valid)
     );
 
     // Clock generation (25 MHz -> 40 ns period)
@@ -90,8 +95,8 @@ module uart_sampler_tb;
 
     // Monitor output
     initial begin
-        $monitor("Time = %0t ns, rx_in = %b, data_out = %h, data_valid = %b",
-                 $time, rx_in, data_out, data_valid);
+        $monitor("Time = %0t ns, rx_in = %b, data_out = %h, data_valid = %b, serial_out = %b, serial_valid = %b",
+                 $time, rx_in, data_out, data_valid, serial_out, serial_valid);
     end
 
     // Dump waves
